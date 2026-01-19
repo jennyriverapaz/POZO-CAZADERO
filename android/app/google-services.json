@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "804181704830",
+    "project_id": "agua-pwa-22618",
+    "storage_bucket": "agua-pwa-22618.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:804181704830:android:0ce8080abe24ff68ca982f",
+        "android_client_info": {
+          "package_name": "com.example.agua_pwa"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA6nlJ_FnWRMwdjdvgPaLS_dmNaJN1SaVE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
