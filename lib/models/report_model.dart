@@ -7,6 +7,9 @@ class ReportModel {
   final String fotoUrl; // La URL de la imagen en internet
   final String estado; // "Pendiente", "En Reparación", "Resuelto"
   final DateTime fechaReporte;
+  
+  // 1. NUEVO CAMPO: Mapa para latitud y longitud
+  final Map<String, dynamic>? ubicacion; 
 
   ReportModel({
     required this.id,
@@ -15,10 +18,11 @@ class ReportModel {
     required this.fotoUrl,
     required this.estado,
     required this.fechaReporte,
+    this.ubicacion, // <--- Lo agregamos al constructor (es opcional)
   });
 
   factory ReportModel.fromFirestore(DocumentSnapshot doc) {
-    Map data = doc.data() as Map<String, dynamic>;
+    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     return ReportModel(
       id: doc.id,
       tipo: data['tipo'] ?? '',
@@ -26,6 +30,10 @@ class ReportModel {
       fotoUrl: data['fotoUrl'] ?? '',
       estado: data['estado'] ?? 'Pendiente',
       fechaReporte: (data['fechaReporte'] as Timestamp).toDate(),
+      
+      // 2. RECUPERAR DE FIREBASE
+      // Si existe el campo 'ubicacion', lo tomamos, si no, queda nulo.
+      ubicacion: data['ubicacion'] is Map ? data['ubicacion'] : null,
     );
   }
 
@@ -36,6 +44,9 @@ class ReportModel {
       'fotoUrl': fotoUrl,
       'estado': estado,
       'fechaReporte': fechaReporte,
+      
+      // 3. GUARDAR EN FIREBASE
+      'ubicacion': ubicacion, 
     };
   }
 }

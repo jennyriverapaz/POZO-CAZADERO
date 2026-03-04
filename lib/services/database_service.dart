@@ -123,7 +123,16 @@ class DatabaseService {
       consumoM3: consumo,
       montoTotal: monto,
       periodo: periodo,
-      pagado: false
+      pagado: false,
+      comprobanteUrl: '',
+      direccion: 'CONOCIDO',
+      lecturaAnterior: 0.0,
+      lecturaActual: 0.0,
+      adeudoAnterior: 0.0,
+      recargos: 0.0,
+      extras: 0.0,
+      faltaAsamblea: 0.0,
+      drenaje: 0.0,
     );
     
     await _db.collection('receipts').add(recibo.toMap());

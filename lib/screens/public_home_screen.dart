@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'public_receipts_screen.dart';
 import 'create_report_screen.dart'; 
 import 'transparency_screen.dart'; 
+import 'chatbot_screen.dart';
 
 class PublicHomeScreen extends StatelessWidget {
   final _medidorController = TextEditingController();
@@ -22,9 +23,9 @@ class PublicHomeScreen extends StatelessWidget {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
             child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: 500), // Para que no se estire feo en PC
+              constraints: const BoxConstraints(maxWidth: 500), // Para que no se estire feo en PC
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -38,11 +39,11 @@ class PublicHomeScreen extends StatelessWidget {
                     ),
                   ),
                   
-                  SizedBox(height: 10),
+                  const SizedBox(height: 10),
                   
                   // LOGO ESTILIZADO
                   Container(
-                    padding: EdgeInsets.all(25),
+                    padding: const EdgeInsets.all(25),
                     decoration: BoxDecoration(
                       color: primaryColor.withOpacity(0.1), // Fondo suavecito
                       shape: BoxShape.circle,
@@ -50,30 +51,30 @@ class PublicHomeScreen extends StatelessWidget {
                     child: Icon(Icons.water_drop_rounded, size: 80, color: primaryColor),
                   ),
                   
-                  SizedBox(height: 30),
+                  const SizedBox(height: 30),
                   
                   Text(
                     "Servicio de Agua", 
                     style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.blueGrey[900], letterSpacing: -0.5)
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Text(
                     "Consulta recibos, reporta fugas y revisa la transparencia de tu comunidad.", 
                     style: TextStyle(fontSize: 16, color: Colors.blueGrey[600], height: 1.5),
                     textAlign: TextAlign.center,
                   ),
                   
-                  SizedBox(height: 50),
+                  const SizedBox(height: 50),
                   
                   // INPUT GRANDE CON SOMBRA
                   Container(
                     decoration: BoxDecoration(
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: Offset(0, 10))]
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, 10))]
                     ),
                     child: TextField(
                       controller: _medidorController,
-                      style: TextStyle(fontSize: 18),
-                      decoration: InputDecoration(
+                      style: const TextStyle(fontSize: 18),
+                      decoration: const InputDecoration(
                         hintText: "Ingresa tu Número de Medidor",
                         prefixIcon: Icon(Icons.search),
                         filled: true,
@@ -83,21 +84,20 @@ class PublicHomeScreen extends StatelessWidget {
                     ),
                   ),
                   
-                  SizedBox(height: 25),
+                  const SizedBox(height: 25),
                   
                   // BOTÓN PRINCIPAL (Grande y Turquesa)
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () => _irAConsulta(context),
-                      child: Text("CONSULTAR RECIBOS"),
-                      // El estilo ya viene del main.dart, no hace falta repetirlo aquí
+                      child: const Text("CONSULTAR RECIBOS"),
                     ),
                   ),
                   
-                  SizedBox(height: 50),
+                  const SizedBox(height: 50),
                   Divider(color: Colors.grey[200]),
-                  SizedBox(height: 30),
+                  const SizedBox(height: 30),
 
                   // BOTONES SECUNDARIOS (En fila para que se vea moderno)
                   Row(
@@ -112,7 +112,7 @@ class PublicHomeScreen extends StatelessWidget {
                         ),
                       ),
                       
-                      SizedBox(width: 20),
+                      const SizedBox(width: 20),
                       
                       // Transparencia
                       Expanded(
@@ -126,12 +126,24 @@ class PublicHomeScreen extends StatelessWidget {
                     ],
                   ),
                   
-                  SizedBox(height: 30),
+                  const SizedBox(height: 30),
                 ],
               ),
             ),
           ),
         ),
+      ),
+      // --- AQUÍ AGREGAMOS EL BOTÓN DEL CHAT ---
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: Theme.of(context).colorScheme.primary, // Usa el color principal de tu tema
+        child: const Icon(Icons.support_agent, color: Colors.white),
+        tooltip: 'Asistente Virtual',
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const ChatbotScreen()),
+          );
+        },
       ),
     );
   }
@@ -152,7 +164,7 @@ class _BotonCuadrado extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
         decoration: BoxDecoration(
           color: color.withOpacity(0.08), // Fondo muy clarito del mismo color
           borderRadius: BorderRadius.circular(16),
@@ -161,7 +173,7 @@ class _BotonCuadrado extends StatelessWidget {
         child: Column(
           children: [
             Icon(icon, size: 32, color: color),
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             Text(
               titulo, 
               textAlign: TextAlign.center,

@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:geolocator/geolocator.dart'; 
 import '../models/report_model.dart';
 import '../services/database_service.dart';
-// 1. IMPORTAMOS EL SERVICIO DE NOTIFICACIONES
 import '../services/notification_service.dart';
 
 class CreateReportScreen extends StatefulWidget {
@@ -20,12 +20,79 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
   String _tipoSeleccionado = 'Fuga de Agua';
   final List<String> _tipos = ['Fuga de Agua', 'Falta de Agua', 'Calidad del Agua', 'Otro'];
   
+  // Variables de Imagen
   Uint8List? _webImage;
   String? _base64Image;
   
+  // Variables de Ubicación (GPS)
+  Position? _ubicacionActual;
+  bool _cargandoUbicacion = false;
+  String _textoUbicacion = "Toca para agregar ubicación GPS";
+
+  // Variables de Estado
   bool _isProcessing = false;
   String _statusMessage = ""; 
 
+  // --- FUNCIÓN CORREGIDA PARA OBTENER UBICACIÓN (CON TIMEOUT) ---
+  Future<void> _obtenerUbicacion() async {
+    setState(() {
+      _cargandoUbicacion = true;
+      _textoUbicacion = "Buscando..."; 
+    });
+
+    try {
+      // 1. Verificaciones de siempre
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) throw 'Enciende el GPS.';
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) throw 'Permiso denegado.';
+      }
+      if (permission == LocationPermission.deniedForever) throw 'Permisos bloqueados.';
+
+      // --- ESTRATEGIA TIPO INSTAGRAM ---
+      Position? position;
+
+      // PASO A: Intentar leer la memoria (Caché)
+      // Esto es lo que hace que Instagram se sienta instantáneo.
+      try {
+        position = await Geolocator.getLastKnownPosition();
+      } catch (e) {
+        // Si falla, no importa, seguimos al paso B
+      }
+
+      // PASO B: Si no había memoria, buscar usando Wi-Fi (Low Accuracy)
+      // Usamos 'low' porque funciona dentro de casas y oficinas.
+      if (position == null) {
+        position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.low, 
+          timeLimit: const Duration(seconds: 10)
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          _ubicacionActual = position;
+          _textoUbicacion = "📍 Ubicación lista";
+          _cargandoUbicacion = false;
+        });
+      }
+
+    } catch (e) {
+      print("Error: $e");
+      if (mounted) {
+        setState(() {
+          // Si falla incluso con Low Accuracy, es probable que no tenga señal
+          _textoUbicacion = "No se pudo detectar. Intenta afuera.";
+          _cargandoUbicacion = false;
+        });
+      }
+    }
+  }
+
+  // --- FUNCIÓN PARA SELECCIONAR FOTO ---
   Future<void> _seleccionarFoto() async {
     final ImagePicker picker = ImagePicker();
     
@@ -45,7 +112,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
       if (image != null) {
         var f = await image.readAsBytes();
         
-        // Límite de seguridad para Firestore (aprox 700kb)
+        // Límite de seguridad (aprox 700kb)
         if (f.lengthInBytes > 700000) {
           setState(() {
             _isProcessing = false;
@@ -76,6 +143,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     }
   }
 
+  // --- FUNCIÓN PARA ENVIAR REPORTE ---
   void _enviarReporte() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
@@ -83,8 +151,16 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         _statusMessage = "Enviando reporte...";
       });
 
-      // --- INICIO DEL PROCESO ---
       try {
+        // Preparamos el mapa de ubicación si existe
+        Map<String, double>? mapaUbicacion;
+        if (_ubicacionActual != null) {
+          mapaUbicacion = {
+            'lat': _ubicacionActual!.latitude,
+            'lng': _ubicacionActual!.longitude,
+          };
+        }
+
         final reporte = ReportModel(
           id: '',
           tipo: _tipoSeleccionado,
@@ -92,15 +168,13 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
           fotoUrl: _base64Image ?? "", 
           estado: 'Pendiente',
           fechaReporte: DateTime.now(),
+          ubicacion: mapaUbicacion, 
         );
 
-        // PASO 1: GUARDAR EN LA BASE DE DATOS
-        // Si esto falla, salta al 'catch' de abajo y muestra error.
-        await _db.crearReporte(reporte).timeout(Duration(seconds: 15));
+        // PASO 1: GUARDAR EN BD
+        await _db.crearReporte(reporte).timeout(const Duration(seconds: 15));
 
-        // PASO 2: ENVIAR NOTIFICACIÓN (Aislado)
-        // Lo ponemos en su propio try-catch. Si falla (común en web por CORS),
-        // NO afecta al usuario, el reporte ya se guardó.
+        // PASO 2: NOTIFICACIÓN
         try {
            print("Intentando notificar a admins...");
            await NotificationService().notifyAdminsOfNewReport(_tipoSeleccionado);
@@ -113,19 +187,18 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
            setState(() => _isProcessing = false);
            Navigator.pop(context);
            ScaffoldMessenger.of(context).showSnackBar(
-             SnackBar(
+             const SnackBar(
                backgroundColor: Colors.green, 
                content: Text("¡Reporte enviado exitosamente!")
              )
            );
         }
       } catch (e) {
-        // ERROR AL GUARDAR EN BASE DE DATOS
         print("Error DB: $e");
         if (mounted) {
           setState(() {
              _isProcessing = false;
-             _statusMessage = "No se pudo guardar: Verifica tu conexión o permisos.";
+             _statusMessage = "No se pudo guardar: Verifica tu conexión.";
           });
         }
       }
@@ -135,43 +208,85 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Reportar Problema")),
+      appBar: AppBar(title: const Text("Reportar Problema")),
       body: Padding(
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
           child: ListView(
             children: [
               if (_statusMessage.isNotEmpty)
                 Container(
-                  padding: EdgeInsets.all(10),
-                  color: _statusMessage.contains("Error") || _statusMessage.contains("No se pudo") 
-                      ? Colors.red[100] 
-                      : Colors.yellow[100],
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: _statusMessage.contains("Error") || _statusMessage.contains("No se pudo") 
+                        ? Colors.red[100] 
+                        : Colors.yellow[100],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                   child: Text(
                     _statusMessage, 
-                    style: TextStyle(color: Colors.black87), 
+                    style: const TextStyle(color: Colors.black87), 
                     textAlign: TextAlign.center
                   ),
                 ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
 
               DropdownButtonFormField(
                 value: _tipoSeleccionado,
                 items: _tipos.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
                 onChanged: (val) => setState(() => _tipoSeleccionado = val.toString()),
-                decoration: InputDecoration(labelText: "Tipo de Problema", border: OutlineInputBorder()),
+                decoration: const InputDecoration(labelText: "Tipo de Problema", border: OutlineInputBorder()),
               ),
-              SizedBox(height: 15),
+              const SizedBox(height: 15),
               
               TextFormField(
                 controller: _descController,
                 maxLines: 3,
-                decoration: InputDecoration(labelText: "Descripción", border: OutlineInputBorder()),
+                decoration: const InputDecoration(labelText: "Descripción", border: OutlineInputBorder()),
                 validator: (v) => v!.isEmpty ? 'La descripción es obligatoria' : null,
               ),
-              SizedBox(height: 20),
+              
+              const SizedBox(height: 20),
 
+              // --- BOTÓN DE GEOLOCALIZACIÓN ---
+              InkWell(
+                onTap: _cargandoUbicacion ? null : _obtenerUbicacion,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: _ubicacionActual != null ? Colors.green.shade50 : Colors.grey.shade100,
+                    border: Border.all(
+                      color: _ubicacionActual != null ? Colors.green : Colors.grey.shade400
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.location_on, 
+                        color: _ubicacionActual != null ? Colors.green : Colors.grey,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _textoUbicacion,
+                          style: TextStyle(
+                            color: _ubicacionActual != null ? Colors.green.shade900 : Colors.black87,
+                            fontWeight: FontWeight.bold
+                          ),
+                        ),
+                      ),
+                      if (_cargandoUbicacion)
+                        const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // --- SELECCIONAR FOTO ---
               GestureDetector(
                 onTap: _isProcessing ? null : _seleccionarFoto,
                 child: Container(
@@ -189,7 +304,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                       : Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.add_a_photo, size: 40, color: Colors.grey),
+                            const Icon(Icons.add_a_photo, size: 40, color: Colors.grey),
                             Text("Tocar para agregar foto (Opcional)", style: TextStyle(color: Colors.grey[700])),
                           ],
                         ),
@@ -198,8 +313,8 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
               
               if (_webImage != null)
                 TextButton.icon(
-                  icon: Icon(Icons.delete, color: Colors.red, size: 18),
-                  label: Text("Quitar foto", style: TextStyle(color: Colors.red)),
+                  icon: const Icon(Icons.delete, color: Colors.red, size: 18),
+                  label: const Text("Quitar foto", style: TextStyle(color: Colors.red)),
                   onPressed: () {
                     setState(() {
                       _webImage = null;
@@ -209,17 +324,17 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                   },
                 ),
 
-              SizedBox(height: 30),
+              const SizedBox(height: 30),
               
               _isProcessing
-                  ? Center(child: CircularProgressIndicator())
+                  ? const Center(child: CircularProgressIndicator())
                   : ElevatedButton(
                       onPressed: _enviarReporte,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12.0),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+                      child: const Padding(
+                        padding: EdgeInsets.all(12.0),
                         child: Text("ENVIAR REPORTE", style: TextStyle(fontSize: 18)),
                       ),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
                     )
             ],
           ),

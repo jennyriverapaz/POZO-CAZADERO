@@ -2,7 +2,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
-import '../models/receipt_model.dart';
+import '../models/receipt_model.dart'; // Asegúrate de que esta ruta sea correcta
 
 class PdfService {
   Future<void> imprimirRecibo(ReceiptModel recibo) async {
@@ -10,117 +10,206 @@ class PdfService {
 
     doc.addPage(
       pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: pw.EdgeInsets.all(32), // Margen para que se vea mejor
+        pageFormat: PdfPageFormat.letter,
+        margin: const pw.EdgeInsets.all(40), // Márgenes típicos de impresión
         build: (pw.Context context) {
+          
+          // --- FUNCIÓN AUXILIAR PARA CREAR LAS "CELDAS" TIPO EXCEL ---
+          pw.Widget buildCell(
+            String text, {
+            int flex = 1,
+            bool isBold = false,
+            pw.Alignment align = pw.Alignment.centerLeft,
+            double fontSize = 10,
+            double? height,
+          }) {
+            return pw.Expanded(
+              flex: flex,
+              child: pw.Container(
+                height: height,
+                padding: const pw.EdgeInsets.all(4),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(width: 0.5, color: PdfColors.black),
+                ),
+                alignment: align,
+                child: pw.Text(
+                  text,
+                  style: pw.TextStyle(
+                    fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+                    fontSize: fontSize,
+                  ),
+                ),
+              ),
+            );
+          }
+
+          // --- FUNCIÓN AUXILIAR PARA LA TABLA DE CONCEPTOS ---
+          pw.Widget buildConceptRow(String concepto, String importe) {
+            return pw.Row(
+              children: [
+                buildCell(concepto, flex: 2, isBold: true),
+                buildCell(importe, flex: 1, align: pw.Alignment.centerRight),
+                buildCell("", flex: 2), // Espacio en blanco de la derecha
+              ],
+            );
+          }
+
           return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
             children: [
-              // 1. ENCABEZADO CON ESTADO DE PAGO
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text("Comité de Agua Potable", style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-                      pw.Text("Comprobante de Servicio", style: pw.TextStyle(fontSize: 14, color: PdfColors.grey700)),
-                    ],
-                  ),
-                  // Sello de PAGADO o PENDIENTE
-                  pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(
-                        color: recibo.pagado ? PdfColors.green : PdfColors.red, 
-                        width: 2
-                      ),
-                      borderRadius: pw.BorderRadius.circular(5),
-                    ),
-                    child: pw.Text(
-                      recibo.pagado ? "PAGADO" : "PENDIENTE",
-                      style: pw.TextStyle(
-                        color: recibo.pagado ? PdfColors.green : PdfColors.red, 
-                        fontWeight: pw.FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              
-              pw.SizedBox(height: 20),
-              pw.Divider(),
-              pw.SizedBox(height: 20),
-              
-              // 2. DATOS DEL USUARIO Y PERIODO
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text("Usuario:", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text(recibo.nombreUsuario, style: pw.TextStyle(fontSize: 16)),
-                      pw.SizedBox(height: 5),
-                      pw.Text("No. Medidor:", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text(recibo.numeroMedidor, style: pw.TextStyle(fontSize: 16)),
-                    ],
-                  ),
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Text("Periodo:", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text(recibo.periodo, style: pw.TextStyle(fontSize: 16)),
-                      pw.SizedBox(height: 5),
-                      pw.Text("Fecha Emisión:", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text(DateFormat('dd/MM/yyyy').format(recibo.fechaEmision)),
-                    ],
-                  ),
-                ],
+              // 1. ENCABEZADO: RECIBO DE PAGO
+              pw.Container(
+                alignment: pw.Alignment.center,
+                decoration: pw.BoxDecoration(border: pw.Border.all(width: 0.5)),
+                padding: const pw.EdgeInsets.all(2),
+                child: pw.Text("RECIBO DE PAGO", style: pw.TextStyle(fontSize: 10)),
               ),
 
-              pw.SizedBox(height: 30),
-
-              // 3. TABLA DE DETALLES
-              pw.Table.fromTextArray(
-                context: context,
-                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
-                headerDecoration: pw.BoxDecoration(color: PdfColors.blue),
-                cellAlignment: pw.Alignment.centerLeft,
-                data: <List<String>>[
-                  <String>['Concepto', 'Detalle'],
-                  <String>['Consumo Registrado', '${recibo.consumoM3} m³'],
-                  <String>['Tarifa Base', 'Estándar'],
-                ],
+              // 2. PERIODO GIGANTE
+              pw.Container(
+                alignment: pw.Alignment.center,
+                decoration: pw.BoxDecoration(
+                  border: pw.Border(
+                    left: const pw.BorderSide(width: 0.5), 
+                    right: const pw.BorderSide(width: 0.5), 
+                    bottom: const pw.BorderSide(width: 0.5)
+                  )
+                ),
+                padding: const pw.EdgeInsets.all(5),
+                child: pw.Text(
+                  recibo.periodo.toUpperCase(), 
+                  style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)
+                ),
               ),
-              
+
+              // 3. MES DE FACTURACION Y MEDIDOR
+              pw.Row(
+                children: [
+                  buildCell("MES DE FACTURACION", flex: 2, isBold: true),
+                  buildCell("MEDIDOR", flex: 2, align: pw.Alignment.center, isBold: true),
+                  buildCell(recibo.numeroMedidor, flex: 1, align: pw.Alignment.center, isBold: true, fontSize: 16),
+                ]
+              ),
+
+              // 4. DATOS DEL CLIENTE
+              pw.Row(
+                children: [
+                  buildCell("NOMBRE", flex: 2, isBold: true),
+                  buildCell(recibo.nombreUsuario.toUpperCase(), flex: 3, align: pw.Alignment.center, isBold: true, fontSize: 12),
+                ]
+              ),
+              pw.Row(
+                children: [
+                  buildCell("DIRECCION", flex: 2, isBold: true),
+                  buildCell("CONOCIDO", flex: 3, align: pw.Alignment.center), // *Placeholder*
+                ]
+              ),
+              pw.Row(
+                children: [
+                  buildCell("# DE MEDIDOR", flex: 2, isBold: true),
+                  buildCell(recibo.numeroMedidor, flex: 3, align: pw.Alignment.center),
+                ]
+              ),
+
+              // 5. LECTURAS
+              pw.Row(
+                children: [
+                  buildCell("LECTURA ANTERIOR", flex: 2, isBold: true),
+                  buildCell("0", flex: 1, align: pw.Alignment.center), // *Placeholder*
+                  buildCell("LECTURA ACTUAL", flex: 2, isBold: true, align: pw.Alignment.center),
+                  buildCell("0", flex: 1, align: pw.Alignment.center), // *Placeholder*
+                ]
+              ),
+
+              // 6. CONSUMOS M3
+              pw.Row(
+                children: [
+                  buildCell("M3 DE CONSUMO\nACTUAL", flex: 2, isBold: true, align: pw.Alignment.center),
+                  buildCell("${recibo.consumoM3} M3", flex: 3, align: pw.Alignment.center, isBold: true, fontSize: 14),
+                ]
+              ),
+
+              // 7. TABLA DE CONCEPTOS
+              pw.Row(
+                children: [
+                  buildCell("CONCEPTO", flex: 2, isBold: true),
+                  buildCell("IMPORTE", flex: 1, isBold: true, align: pw.Alignment.center),
+                  buildCell("", flex: 2), 
+                ]
+              ),
+              buildConceptRow("CONSUMO ACTUAL", "\$ ${recibo.montoTotal.toStringAsFixed(2)}"),
+              buildConceptRow("ADEUDO ANTERIOR", "\$ -"),
+              buildConceptRow("RECARGOS", "\$ -"),
+              buildConceptRow("EXTRAS", "\$ -"),
+              buildConceptRow("FALTA ASAMBLEA", "\$ -"),
+              buildConceptRow("DRENAJE", "\$ -"), // Si el drenaje es fijo, lo podemos sumar al modelo luego.
+
+              // 8. TOTAL A PAGAR
+              pw.Row(
+                children: [
+                  buildCell("TOTAL A PAGAR", flex: 2, isBold: true),
+                  buildCell("\$ ${recibo.montoTotal.toStringAsFixed(2)}", flex: 1, align: pw.Alignment.centerRight, isBold: true, fontSize: 16),
+                  buildCell("", flex: 2),
+                ]
+              ),
+
+              // 9. NOTA (Caja grande)
+              pw.Row(
+                children: [
+                  buildCell("NOTA:", flex: 1, isBold: true, align: pw.Alignment.topLeft, height: 60),
+                  buildCell("", flex: 4, height: 60), // Espacio para escribir
+                ]
+              ),
+
+              // 10. FECHAS Y HORARIOS (Placeholders por ahora)
+              pw.Row(
+                children: [
+                  buildCell("PERIODO DE PAGO", flex: 2, isBold: true),
+                  buildCell("INICIO", flex: 1, align: pw.Alignment.center),
+                  buildCell("AL", flex: 1, align: pw.Alignment.center, isBold: true),
+                  buildCell("FIN", flex: 1, align: pw.Alignment.center),
+                ]
+              ),
+              pw.Row(
+                children: [
+                  buildCell("FECHA DE PAGO", flex: 2, isBold: true),
+                  buildCell("SÁBADO", flex: 3, align: pw.Alignment.center),
+                ]
+              ),
+              pw.Row(
+                children: [
+                  buildCell("HORARIOS", flex: 2),
+                  buildCell("10:00 - 15:00 HRS", flex: 3, align: pw.Alignment.center),
+                ]
+              ),
+
               pw.SizedBox(height: 10),
 
-              // 4. TOTAL A PAGAR (Alineado a la derecha)
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.end,
-                children: [
-                  pw.Text("TOTAL A PAGAR: ", style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-                  pw.Text("\$${recibo.montoTotal.toStringAsFixed(2)} MXN", style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
-                ],
+              // 11. PIE DE PÁGINA
+              pw.Center(
+                child: pw.Text(
+                  "PARA CUALQUIER ACLARACION TRAER RECIBO ANTERIOR",
+                  style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                ),
               ),
 
-              pw.Spacer(),
-              
-              // 5. PIE DE PÁGINA
-              pw.Divider(),
-              pw.Center(
-                child: pw.Text("Gracias por su pago puntual. Este documento es un comprobante oficial.", 
-                style: pw.TextStyle(color: PdfColors.grey, fontSize: 10)),
-              ),
+              pw.SizedBox(height: 20),
+
+              // 12. LOGOS (Marcadores de posición)
+              // Aquí pondremos las imágenes cuando las subas a tu proyecto
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+                children: [
+                  pw.Text("[Espacio para Logo Gota]"),
+                  pw.Text("[Espacio para Código SAT]"),
+                ]
+              )
             ],
           );
         },
       ),
     );
 
-    // Esto abre la vista previa de impresión
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => doc.save(),
       name: 'Recibo_${recibo.periodo}_${recibo.numeroMedidor}',
