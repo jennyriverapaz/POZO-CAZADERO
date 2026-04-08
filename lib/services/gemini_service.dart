@@ -1,16 +1,19 @@
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class GeminiService {
-  // OJO: En producción, usa flutter_dotenv para no dejar la KEY visible.
-  static const String _apiKey = 'TU_API_KEY_AQUI'; 
-
   late final GenerativeModel _model;
   ChatSession? _chat;
 
   GeminiService() {
+    final apiKey = dotenv.env['GEMINI_API_KEY'];
+    if (apiKey == null || apiKey.isEmpty || apiKey == 'AIzaSyBCHuDbpA9qv4l9BGAd4Lv063ufgFy8XLc') {
+      print('ERROR: No se encontró GEMINI_API_KEY en el archivo .env');
+    }
+
     _model = GenerativeModel(
       model: 'gemini-1.5-flash',
-      apiKey: _apiKey,
+      apiKey: apiKey ?? 'ERROR_NO_API_KEY',
       systemInstruction: Content.system(
         'Eres el asistente virtual de la App del Pozo de Agua. '
         'Tu objetivo es ayudar a los vecinos con respuestas breves y amables. '
@@ -30,7 +33,8 @@ class GeminiService {
       final response = await _chat?.sendMessage(Content.text(message));
       return response?.text;
     } catch (e) {
-      return "Error de conexión. Intenta más tarde.";
+      print('Error en GeminiService: $e'); // Log visual en consola
+      return "Error de conexión con el asistente. Verifica que hayas configurado tu API Key localmente.";
     }
   }
 }

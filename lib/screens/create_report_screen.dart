@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import '../models/report_model.dart';
 import '../services/database_service.dart';
 import '../services/notification_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class CreateReportScreen extends StatefulWidget {
   @override
@@ -52,7 +53,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
       }
       if (permission == LocationPermission.deniedForever) throw 'Permisos bloqueados.';
 
-      // --- ESTRATEGIA TIPO INSTAGRAM ---
+    
       Position? position;
 
       // PASO A: Intentar leer la memoria (Caché)
@@ -144,23 +145,29 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
   }
 
   // --- FUNCIÓN PARA ENVIAR REPORTE ---
+// --- FUNCIÓN PARA ENVIAR REPORTE (VERSIÓN MEJORADA PARA WEB) ---
   void _enviarReporte() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isProcessing = true;
-        _statusMessage = "Enviando reporte...";
+        _statusMessage = "Abriendo WhatsApp...";
       });
 
       try {
-        // Preparamos el mapa de ubicación si existe
+        // 1. Preparamos la ubicación
         Map<String, double>? mapaUbicacion;
+        String linkMapas = "Sin ubicación GPS ❌"; 
+        
         if (_ubicacionActual != null) {
           mapaUbicacion = {
             'lat': _ubicacionActual!.latitude,
             'lng': _ubicacionActual!.longitude,
           };
+          // Link oficial y corregido de Google Maps
+          linkMapas = "https://www.google.com/maps/search/?api=1&query=${_ubicacionActual!.latitude},${_ubicacionActual!.longitude}";
         }
 
+        // 2. Armamos el reporte para Firebase
         final reporte = ReportModel(
           id: '',
           tipo: _tipoSeleccionado,
@@ -171,34 +178,45 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
           ubicacion: mapaUbicacion, 
         );
 
-        // PASO 1: GUARDAR EN BD
-        await _db.crearReporte(reporte).timeout(const Duration(seconds: 15));
-
-        // PASO 2: NOTIFICACIÓN
-        try {
-           print("Intentando notificar a admins...");
-           await NotificationService().notifyAdminsOfNewReport(_tipoSeleccionado);
-        } catch (pushError) {
-           print("La notificación falló pero el reporte está a salvo: $pushError");
+        // 3. PREPARAMOS WHATSAPP (Asegúrate de poner el número de la jefa aquí)
+        String numeroWhatsApp = "524271511220"; 
+        
+        String mensaje = "🚨 *NUEVO REPORTE* 🚨\n\n"
+            "💧 *Tipo:* $_tipoSeleccionado\n"
+            "📝 *Descripción:* ${_descController.text}\n"
+            "📍 *Ubicación:* $linkMapas\n";
+            
+        if (_webImage != null) {
+            mensaje += "\n📸 *(Tengo una foto del problema, te la envío por aquí en un momento)*";
         }
 
-        // PASO 3: ÉXITO
+        String urlEscrita = "https://wa.me/$numeroWhatsApp?text=${Uri.encodeComponent(mensaje)}";
+        Uri urlWhatsApp = Uri.parse(urlEscrita);
+
+        // 👇 EL TRUCO ESTÁ AQUÍ 👇
+        // ABRIMOS WHATSAPP PRIMERO (Sin esperas, para que Chrome no nos bloquee)
+        launchUrl(urlWhatsApp, mode: LaunchMode.externalApplication);
+
+        // LUEGO GUARDAMOS EN LA BASE DE DATOS (Se hace en el fondo)
+        await _db.crearReporte(reporte).timeout(const Duration(seconds: 15));
+
+        // ÉXITO
         if (mounted) {
            setState(() => _isProcessing = false);
-           Navigator.pop(context);
+           Navigator.pop(context); // Cierra la pantalla
            ScaffoldMessenger.of(context).showSnackBar(
              const SnackBar(
                backgroundColor: Colors.green, 
-               content: Text("¡Reporte enviado exitosamente!")
+               content: Text("¡Reporte guardado y enviado a WhatsApp!")
              )
            );
         }
       } catch (e) {
-        print("Error DB: $e");
+        print("Error al reportar: $e");
         if (mounted) {
           setState(() {
              _isProcessing = false;
-             _statusMessage = "No se pudo guardar: Verifica tu conexión.";
+             _statusMessage = "Error al enviar: $e";
           });
         }
       }

@@ -60,6 +60,7 @@ class DatabaseService {
         .map((snapshot) => snapshot.docs
         .map((doc) => ReceiptModel.fromFirestore(doc)).toList());
   }
+  
   Stream<List<ReceiptModel>> obtenerMisRecibos(String uid) {
     return _db.collection('receipts')
         .where('userId', isEqualTo: uid)

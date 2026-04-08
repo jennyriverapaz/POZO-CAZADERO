@@ -1,96 +1,132 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../services/database_service.dart';
-// 1. IMPORTAMOS EL SERVICIO DE NOTIFICACIONES
-import '../services/notification_service.dart';
+import '../services/api_service.dart';
 
 class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
   @override
-  _LoginScreenState createState() => _LoginScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final DatabaseService _dbService = DatabaseService();
+  final TextEditingController _folioOEmailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final ApiService _apiService = ApiService();
+
   bool _isLoading = false;
 
   void _login() async {
+    // 1. Validamos que no envíen campos vacíos
+    if (_folioOEmailController.text.trim().isEmpty ||
+        _passwordController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Por favor llena todos los campos")),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
+
     try {
-      // 1. Autenticación con Firebase Auth
-      UserCredential cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+      // 2. Esperamos un verdadero (true) o falso (false) del api_service
+      bool success = await _apiService.login(
+        _folioOEmailController.text.trim(),
+        _passwordController.text.trim(),
       );
 
-      // 2. Obtener datos del usuario desde Firestore
-      var userDoc = await _dbService.obtenerUsuario(cred.user!.uid);
+      if (!mounted) return;
 
-      // 3. Verificar si es Admin
-      if (userDoc != null && userDoc.rol == 'admin') {
-        
-        // --- CÓDIGO NUEVO PARA NOTIFICACIONES ---
-        // Si es admin, guardamos su Token en la base de datos
-        try {
-          NotificationService notifService = NotificationService();
-          await notifService.uploadTokenForUser(cred.user!.uid);
-          print("Token de admin actualizado correctamente");
-        } catch (e) {
-          print("Error al guardar token (pero dejamos pasar al admin): $e");
-        }
-        // ----------------------------------------
-
-        // 4. Navegar al Dashboard
-        Navigator.pushReplacementNamed(context, '/admin_dashboard');
-        
+      if (success) {
+        // Si entró correctamente, mandamos al Home del usuario
+        Navigator.pushReplacementNamed(context, '/user_home');
       } else {
-        // Si entra pero no es admin, lo sacamos (opcionalmente hacemos logout)
-        await FirebaseAuth.instance.signOut(); 
+        // Si falló, mostramos el error
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("No tienes permisos de administrador"))
+          SnackBar(
+            content: const Text('Credenciales incorrectas o usuario no autorizado'),
+            backgroundColor: Colors.red.shade700,
+          ),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-    } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error de conexión: $e")),
+        );
       }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _folioOEmailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Acceso Administrativo")),
+      appBar: AppBar(
+        title: const Text("Acceso a mi Cuenta"),
+        centerTitle: true,
+      ),
       body: Center(
-        child: Container(
-          width: 350,
-          padding: EdgeInsets.all(20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text("Login Admin", style: TextStyle(fontSize: 24)),
-              SizedBox(height: 20),
-              TextField(
-                controller: _emailController, 
-                decoration: InputDecoration(labelText: "Email")
-              ),
-              SizedBox(height: 10), // Un poco de espacio extra
-              TextField(
-                controller: _passwordController, 
-                decoration: InputDecoration(labelText: "Contraseña"), 
-                obscureText: true
-              ),
-              SizedBox(height: 20),
-              _isLoading 
-                ? CircularProgressIndicator() 
-                : ElevatedButton(
-                    onPressed: _login, 
-                    child: Text("Ingresar")
+        child: SingleChildScrollView(
+          child: Container(
+            width: 350,
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.water_drop,
+                  size: 70,
+                  color: Colors.blue,
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  "Iniciar Sesión",
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 30),
+                TextField(
+                  controller: _folioOEmailController,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(
+                    labelText: "Folio o Correo Electrónico",
+                    prefixIcon: Icon(Icons.person),
+                    border: OutlineInputBorder(),
                   ),
-            ],
+                ),
+                const SizedBox(height: 15),
+                TextField(
+                  controller: _passwordController,
+                  obscureText: true,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _isLoading ? null : _login(),
+                  decoration: const InputDecoration(
+                    labelText: "Contraseña",
+                    prefixIcon: Icon(Icons.lock),
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 30),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _login,
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text("Ingresar", style: TextStyle(fontSize: 16)),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

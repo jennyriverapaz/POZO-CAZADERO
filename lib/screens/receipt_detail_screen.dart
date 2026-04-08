@@ -1,15 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../models/receipt_model.dart';
+// Quité la importación de ReceiptModel por ahora para usar el Map directo
 import '../services/database_service.dart';
 import '../services/pdf_service.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:convert';
 
 class ReceiptDetailScreen extends StatefulWidget {
-  final ReceiptModel recibo;
+  // Ahora recibimos el mapa exacto del JSON y algunos datos extra si los tienes
+  final Map<String, dynamic> recibo;
+  final String numeroContrato; 
+  final String nombreUsuario; // Pasarlo desde el login/perfil
+  final String direccion; // Pasarlo desde el login/perfil
 
-  const ReceiptDetailScreen({Key? key, required this.recibo}) : super(key: key);
+  const ReceiptDetailScreen({
+    super.key, 
+    required this.recibo,
+    this.numeroContrato = 'N/A',
+    this.nombreUsuario = 'USUARIO DEMO',
+    this.direccion = 'DIRECCIÓN DEMO',
+  });
 
   @override
   _ReceiptDetailScreenState createState() => _ReceiptDetailScreenState();
@@ -18,48 +26,29 @@ class ReceiptDetailScreen extends StatefulWidget {
 class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
   final PdfService _pdfService = PdfService();
   final DatabaseService _dbService = DatabaseService();
-  bool _isUploading = false;
+  bool _isLoadingPayment = false;
 
-  Future<void> _subirComprobante() async {
-    final ImagePicker picker = ImagePicker();
-    try {
-      final XFile? image = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 500,
-        imageQuality: 40
+  Future<void> _iniciarPagoMercadoPago() async {
+    setState(() => _isLoadingPayment = true);
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) {
+      setState(() => _isLoadingPayment = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.blue.shade700,
+          content: const Text("Pronto serás redirigido a Mercado Pago..."),
+          behavior: SnackBarBehavior.floating,
+        )
       );
-
-      if (image != null) {
-        setState(() => _isUploading = true);
-        var f = await image.readAsBytes();
-        
-        if (f.lengthInBytes > 800000) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Imagen muy pesada.")));
-          setState(() => _isUploading = false);
-          return;
-        }
-
-        String base64String = base64Encode(f);
-        await _dbService.subirComprobante(widget.recibo.id, base64String);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(backgroundColor: Colors.green, content: Text("Comprobante enviado exitosamente.")));
-          setState(() => _isUploading = false);
-          Navigator.pop(context); 
-        }
-      }
-    } catch (e) {
-      setState(() => _isUploading = false);
     }
   }
 
-  // --- Herramientas para dibujar la tabla estilo Excel ---
-
+  // --- Herramientas para dibujar la tabla ---
   Widget _buildGridRow(List<Widget> cells, {bool isLast = false, double minHeight = 25}) {
     return Container(
       constraints: BoxConstraints(minHeight: minHeight),
       decoration: BoxDecoration(
-        border: isLast ? null : Border(bottom: BorderSide(color: Colors.black, width: 1.0)),
+        border: isLast ? null : const Border(bottom: BorderSide(color: Colors.black, width: 1.0)),
       ),
       child: IntrinsicHeight(
         child: Row(
@@ -81,9 +70,9 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
     return Expanded(
       flex: flex,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         decoration: BoxDecoration(
-          border: rightBorder ? Border(right: BorderSide(color: Colors.black, width: 1.0)) : null,
+          border: rightBorder ? const Border(right: BorderSide(color: Colors.black, width: 1.0)) : null,
         ),
         alignment: alignment,
         child: Text(
@@ -94,7 +83,7 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
             fontStyle: italic ? FontStyle.italic : FontStyle.normal,
             fontSize: fontSize,
             color: Colors.black,
-            fontFamily: 'Arial', // Arial se parece más a Excel
+            fontFamily: 'Arial',
           ),
         ),
       ),
@@ -105,15 +94,15 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
     return Expanded(
       flex: flex,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         decoration: BoxDecoration(
-          border: rightBorder ? Border(right: BorderSide(color: Colors.black, width: 1.0)) : null,
+          border: rightBorder ? const Border(right: BorderSide(color: Colors.black, width: 1.0)) : null,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('\$', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.black)),
-            Text(val == 0 ? '-' : val.toStringAsFixed(2), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.black)),
+            const Text('\$', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.black)),
+            Text(val == 0 ? '-' : val.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.black)),
           ],
         ),
       ),
@@ -122,233 +111,235 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    bool pagado = widget.recibo.pagado;
-    bool revision = !pagado && widget.recibo.comprobanteUrl.isNotEmpty;
-    Color estadoColor = pagado ? Colors.green : (revision ? Colors.orange : Colors.red);
-    String estadoTexto = pagado ? "PAGADO" : (revision ? "EN REVISIÓN" : "PENDIENTE DE PAGO");
-
-    double costoConsumo = widget.recibo.montoTotal - (widget.recibo.adeudoAnterior + widget.recibo.recargos + widget.recibo.extras + widget.recibo.faltaAsamblea + widget.recibo.drenaje);
+    final theme = Theme.of(context).colorScheme;
+    
+    // --- LEYENDO EL JSON REAL ---
+    bool pagado = widget.recibo['estado'] == 'pagado';
+    String periodoLabel = widget.recibo['periodo_label'] ?? 'PERIODO';
+    double totalAPagar = (widget.recibo['total'] ?? 0).toDouble();
+    List<dynamic> lineas = widget.recibo['lineas'] ?? [];
+    
+    // Fechas
+    DateTime fechaEmision = DateTime.tryParse(widget.recibo['fecha_emision'] ?? '') ?? DateTime.now();
+    String fechaVencimientoStr = widget.recibo['fecha_vencimiento'] ?? '';
+    
+    // Colores dinámicos
+    Color estadoColor = pagado ? Colors.green : theme.error;
+    String estadoTexto = pagado ? "PAGADO" : "PENDIENTE DE PAGO";
 
     return Scaffold(
-      backgroundColor: Colors.grey[200], 
-      appBar: AppBar(title: Text("Detalle del Recibo")),
-      body: _isUploading 
-        ? Center(child: CircularProgressIndicator())
-        : SingleChildScrollView(
-          padding: EdgeInsets.all(8),
-          child: Column(
-            children: [
-              // ESTADO FLOTANTE (Para que el usuario sepa su status sin arruinar el diseño)
-              Container(
-                margin: EdgeInsets.only(bottom: 15),
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                decoration: BoxDecoration(
-                  color: estadoColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: estadoColor, width: 2)
-                ),
-                child: Text(estadoTexto, style: TextStyle(color: estadoColor, fontWeight: FontWeight.bold, fontSize: 16)),
-              ),
-
-              // --- LA TABLA EXACTA ---
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: Colors.black, width: 1.5), 
-                ),
-                child: Column(
-                  children: [
-                    // Fila 1: Título pequeño
-                    _buildGridRow([
-                      _buildCell("RECIBO DE PAGO", flex: 1, rightBorder: false, alignment: Alignment.center, fontSize: 9)
-                    ]),
-                    // Fila 2: MES GRANDE
-                    _buildGridRow([
-                      _buildCell(widget.recibo.periodo.toUpperCase(), flex: 1, rightBorder: false, bold: true, fontSize: 20, alignment: Alignment.center)
-                    ], minHeight: 35),
-                    
-                    // --- Inicia cuadrícula de 10 columnas (Flex 4 + 3 + 3) ---
-                    // Fila 3: Mes, Medidor
-                    _buildGridRow([
-                      _buildCell("MES DE FACTURACION\n", flex: 4, bold: true, alignment: Alignment.topLeft),
-                      _buildCell("MEDIDOR", flex: 3, bold: true, alignment: Alignment.center),
-                      _buildCell(widget.recibo.numeroMedidor, flex: 3, bold: true, rightBorder: false, alignment: Alignment.center, fontSize: 16),
-                    ]),
-                    // Fila 4: Nombre
-                    _buildGridRow([
-                      _buildCell("NOMBRE", flex: 4, bold: true),
-                      _buildCell(widget.recibo.nombreUsuario.toUpperCase(), flex: 6, bold: true, italic: true, rightBorder: false, alignment: Alignment.center, fontSize: 12),
-                    ]),
-                    // Fila 5: Dirección
-                    _buildGridRow([
-                      _buildCell("DIRECCION", flex: 4, bold: true),
-                      _buildCell(widget.recibo.direccion.toUpperCase(), flex: 6, rightBorder: false, alignment: Alignment.center),
-                    ]),
-                    // Fila 6: # Medidor
-                    _buildGridRow([
-                      _buildCell("# DE MEDIDOR", flex: 4, bold: true),
-                      _buildCell(widget.recibo.numeroMedidor, flex: 6, rightBorder: false, alignment: Alignment.center),
-                    ]),
-                    // Fila 7: Lecturas (Ajustamos los Flex para que sumen 10)
-                    _buildGridRow([
-                      _buildCell("LECTURA ANTERIOR", flex: 3, bold: true),
-                      _buildCell("${widget.recibo.lecturaAnterior.toInt()}", flex: 2, alignment: Alignment.center),
-                      _buildCell("LECTURA ACTUAL", flex: 3, bold: true),
-                      _buildCell("${widget.recibo.lecturaActual.toInt()}", flex: 2, rightBorder: false, alignment: Alignment.center),
-                    ]),
-                    // Fila 8: M3 Consumo
-                    _buildGridRow([
-                      _buildCell("M3 DE CONSUMO\nACTUAL", flex: 4, bold: true, alignment: Alignment.center),
-                      _buildCell("     ${widget.recibo.consumoM3.toInt()}      M³", flex: 6, rightBorder: false, bold: true, fontSize: 16, alignment: Alignment.centerLeft),
-                    ]),
-                    // Fila 9: Títulos de Tabla
-                    _buildGridRow([
-                      _buildCell("CONCEPTO", flex: 4, bold: true),
-                      _buildCell("IMPORTE", flex: 3, bold: true, alignment: Alignment.center),
-                      _buildCell("", flex: 3, rightBorder: false),
-                    ]),
-                    
-                    // --- CONCEPTOS ---
-                    _buildGridRow([ _buildCell("CONSUMO ACTUAL", flex: 4, bold: true), _buildCurrencyCell(costoConsumo, flex: 3), _buildCell("", flex: 3, rightBorder: false) ]),
-                    _buildGridRow([ _buildCell("ADEUDO ANTERIOR", flex: 4, bold: true), _buildCurrencyCell(widget.recibo.adeudoAnterior, flex: 3), _buildCell("", flex: 3, rightBorder: false) ]),
-                    _buildGridRow([ _buildCell("RECARGOS", flex: 4, bold: true), _buildCurrencyCell(widget.recibo.recargos, flex: 3), _buildCell("", flex: 3, rightBorder: false) ]),
-                    _buildGridRow([ _buildCell("EXTRAS", flex: 4, bold: true), _buildCurrencyCell(widget.recibo.extras, flex: 3), _buildCell("", flex: 3, rightBorder: false) ]),
-                    _buildGridRow([ _buildCell("FALTA ASAMBLEA", flex: 4, bold: true), _buildCurrencyCell(widget.recibo.faltaAsamblea, flex: 3), _buildCell("", flex: 3, rightBorder: false) ]),
-                    _buildGridRow([ _buildCell("DRENAJE", flex: 4, bold: true), _buildCurrencyCell(widget.recibo.drenaje, flex: 3), _buildCell("", flex: 3, rightBorder: false) ]),
-                    
-                    // Fila 10: TOTAL A PAGAR (Igualando el error de ortografía si es necesario, o lo puedes cambiar a "A PAGAR")
-                    _buildGridRow([
-                      _buildCell("TOTAL APAGAR", flex: 4, bold: true),
-                      Expanded(
-                        flex: 6,
-                        child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('\$', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.black)),
-                              Text(widget.recibo.montoTotal.toStringAsFixed(2), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.black)),
-                            ],
-                          ),
-                        ),
-                      )
-                    ]),
-                    
-                    // Fila 11: NOTA
-                    _buildGridRow([
-                      _buildCell("NOTA:\n\n\n\n", flex: 4, bold: true, alignment: Alignment.topLeft),
-                      _buildCell("0", flex: 6, rightBorder: false, alignment: Alignment.topLeft),
-                    ]),
-
-                    // Fila 12: PERIODO DE PAGO
-                    _buildGridRow([
-                      _buildCell("PERIODO DE PAGO", flex: 4, bold: true),
-                      _buildCell(DateFormat('dd-MMM-yy', 'es').format(widget.recibo.fechaEmision).toLowerCase(), flex: 2, bold: true, alignment: Alignment.center),
-                      _buildCell("AL", flex: 1, bold: true, alignment: Alignment.center),
-                      _buildCell(DateFormat('dd-MMM-yy', 'es').format(widget.recibo.fechaEmision.add(Duration(days: 30))).toLowerCase(), flex: 3, rightBorder: false, bold: true, alignment: Alignment.center),
-                    ]),
-
-                    // Fila 13: FECHA DE PAGO 1
-                    _buildGridRow([
-                      _buildCell("FECHA DE PAGO", flex: 4, bold: true),
-                      _buildCell("SABADO 31/ENERO/2026", flex: 6, bold: true, rightBorder: false, alignment: Alignment.center, fontSize: 11),
-                    ]),
-                    _buildGridRow([
-                      _buildCell("HORARIOS", flex: 4),
-                      _buildCell("10:00-15:00 HRS", flex: 6, rightBorder: false, alignment: Alignment.center),
-                    ]),
-
-                    // Fila 14: FECHA DE PAGO 2
-                    _buildGridRow([
-                      _buildCell("FECHA DE PAGO", flex: 4, bold: true),
-                      _buildCell("MIERCOLES 04/FEBRERO/2026", flex: 6, bold: true, rightBorder: false, alignment: Alignment.center, fontSize: 11),
-                    ]),
-                    _buildGridRow([
-                      _buildCell("HORARIOS", flex: 4),
-                      _buildCell("16:00 A 19:00 HRS", flex: 6, rightBorder: false, alignment: Alignment.center),
-                    ]),
-
-                    // PIE DE PÁGINA: Aclaraciones, Logo y Cédula
-                    Container(
-                      padding: EdgeInsets.all(8),
-                      child: Column(
-                        children: [
-                          Text(
-                            "PARA CUALQUIER ACLARACION TRAER RECIBO ANTERIOR",
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blue[900]),
-                            textAlign: TextAlign.center,
-                          ),
-                          SizedBox(height: 10),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              // Placeholder para el Logo
-                              Column(
-                                children: [
-                                  Icon(Icons.water_drop, size: 40, color: Colors.blue),
-                                  Text("POZO EL CAZADERO, A.C.", style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                              // Placeholder para la Cédula Fiscal (Reemplazar con Image.asset cuando tengas la foto real)
-                              Container(
-                                width: 150,
-                                height: 80,
-                                decoration: BoxDecoration(border: Border.all(color: Colors.grey), color: Colors.grey[200]),
-                                alignment: Alignment.center,
-                                child: Text("Cédula SAT\n(Imagen aquí)", textAlign: TextAlign.center, style: TextStyle(fontSize: 10)),
-                              )
-                            ],
-                          )
-                        ],
-                      ),
-                    )
-                  ],
-                ),
-              ),
-
-              SizedBox(height: 20),
-
-              // --- BOTONES DE ACCIÓN (Fuera de la hoja) ---
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.shade700,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
-                  ),
-                  icon: Icon(Icons.picture_as_pdf),
-                  label: Text("DESCARGAR PDF OFICIAL"),
-                  onPressed: () => _pdfService.imprimirRecibo(widget.recibo),
-                ),
-              ),
-
-              SizedBox(height: 15),
-
-              if (!pagado && !revision)
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(vertical: 15),
-                      side: BorderSide(color: Colors.blue),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      backgroundColor: Colors.white,
-                    ),
-                    icon: Icon(Icons.upload_file, color: Colors.blue),
-                    label: Text("SUBIR COMPROBANTE DE PAGO", style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
-                    onPressed: _subirComprobante,
-                  ),
-                ),
-                
-              if (revision)
-                Text("Tu comprobante está siendo revisado por el administrador.", style: TextStyle(color: Colors.orange[800], fontStyle: FontStyle.italic)),
-                
-              SizedBox(height: 30),
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        title: const Text("Detalle del Recibo", style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        foregroundColor: theme.primary,
+        centerTitle: true,
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              theme.primary.withOpacity(0.15),
+              theme.secondary.withOpacity(0.05),
             ],
           ),
         ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: Column(
+                  children: [
+                    // --- ESTADO FLOTANTE ---
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 20, top: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(color: estadoColor.withOpacity(0.5), width: 2),
+                        boxShadow: [
+                          BoxShadow(color: estadoColor.withOpacity(0.2), blurRadius: 15, offset: const Offset(0, 5))
+                        ]
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            pagado ? Icons.check_circle_rounded : Icons.warning_rounded,
+                            color: estadoColor,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(estadoTexto, style: TextStyle(color: estadoColor, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1)),
+                        ],
+                      ),
+                    ),
+
+                    // --- LA TABLA EXACTA DEL RECIBO FISICO ---
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(color: Colors.black, width: 1.5),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 10))
+                        ]
+                      ),
+                      child: Column(
+                        children: [
+                          _buildGridRow([_buildCell("RECIBO DE PAGO", flex: 1, rightBorder: false, alignment: Alignment.center, fontSize: 9)]),
+                          _buildGridRow([_buildCell(periodoLabel.toUpperCase(), flex: 1, rightBorder: false, bold: true, fontSize: 20, alignment: Alignment.center)], minHeight: 35),
+                          _buildGridRow([
+                            _buildCell("MES DE FACTURACION\n", flex: 4, bold: true, alignment: Alignment.topLeft),
+                            _buildCell("CONTRATO", flex: 3, bold: true, alignment: Alignment.center),
+                            _buildCell(widget.numeroContrato, flex: 3, bold: true, rightBorder: false, alignment: Alignment.center, fontSize: 14),
+                          ]),
+                          _buildGridRow([
+                            _buildCell("NOMBRE", flex: 4, bold: true),
+                            _buildCell(widget.nombreUsuario, flex: 6, bold: true, italic: true, rightBorder: false, alignment: Alignment.center, fontSize: 12),
+                          ]),
+                          _buildGridRow([
+                            _buildCell("DIRECCION", flex: 4, bold: true),
+                            _buildCell(widget.direccion, flex: 6, rightBorder: false, alignment: Alignment.center),
+                          ]),
+                          
+                          // Encabezados de Conceptos
+                          _buildGridRow([
+                            _buildCell("CONCEPTO", flex: 4, bold: true, alignment: Alignment.center),
+                            _buildCell("IMPORTE", flex: 3, bold: true, alignment: Alignment.center),
+                            _buildCell("CANT.", flex: 3, rightBorder: false, bold: true, alignment: Alignment.center),
+                          ]),
+                          
+                          // --- CICLO DINÁMICO PARA LAS LÍNEAS DEL JSON ---
+                          ...lineas.map((linea) {
+                            return _buildGridRow([
+                              _buildCell(linea['descripcion'].toString().toUpperCase(), flex: 4, bold: true),
+                              _buildCurrencyCell((linea['subtotal'] ?? 0).toDouble(), flex: 3),
+                              _buildCell(linea['cantidad'].toString(), flex: 3, rightBorder: false, alignment: Alignment.center)
+                            ]);
+                          }),
+
+                          // --- TOTAL ---
+                          _buildGridRow([
+                            _buildCell("TOTAL A PAGAR", flex: 4, bold: true),
+                            Expanded(
+                              flex: 6,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('\$', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.black)),
+                                    Text(totalAPagar.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.black)),
+                                  ],
+                                ),
+                              ),
+                            )
+                          ]),
+                          
+                          _buildGridRow([
+                            _buildCell("FECHA EMISIÓN", flex: 4, bold: true),
+                            _buildCell(DateFormat('dd/MMM/yyyy', 'es').format(fechaEmision).toUpperCase(), flex: 6, bold: true, rightBorder: false, alignment: Alignment.center, fontSize: 11),
+                          ]),
+                          
+                          if (fechaVencimientoStr.isNotEmpty)
+                            _buildGridRow([
+                              _buildCell("VENCIMIENTO", flex: 4, bold: true),
+                              _buildCell(fechaVencimientoStr, flex: 6, bold: true, rightBorder: false, alignment: Alignment.center, fontSize: 11),
+                            ]),
+
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            child: Column(
+                              children: [
+                                Text(
+                                  "PARA CUALQUIER ACLARACION TRAER RECIBO ANTERIOR",
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blue[900]),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    const Column(
+                                      children: [
+                                        Icon(Icons.water_drop, size: 40, color: Colors.blue),
+                                        Text("POZO EL CAZADERO, A.C.", style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                    Container(
+                                      width: 150,
+                                      height: 80,
+                                      decoration: BoxDecoration(border: Border.all(color: Colors.grey), color: Colors.grey[200]),
+                                      alignment: Alignment.center,
+                                      child: const Text("Cédula SAT\n(Imagen aquí)", textAlign: TextAlign.center, style: TextStyle(fontSize: 10)),
+                                    )
+                                  ],
+                                )
+                              ],
+                            ),
+                          )
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 30),
+
+                    // --- BOTONES DE ACCIÓN ---
+                    if (!pagado) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        height: 55,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF009EE3),
+                            foregroundColor: Colors.white,
+                            elevation: 5,
+                            shadowColor: const Color(0xFF009EE3).withOpacity(0.5),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))
+                          ),
+                          icon: _isLoadingPayment 
+                            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            : const Icon(Icons.payment_rounded, size: 28),
+                          label: Text(
+                            _isLoadingPayment ? "PROCESANDO..." : "PAGAR CON MERCADO PAGO", 
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1)
+                          ),
+                          onPressed: _isLoadingPayment ? null : _iniciarPagoMercadoPago,
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+                    ],
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: theme.primary,
+                          side: BorderSide(color: theme.primary.withOpacity(0.5), width: 1.5),
+                          backgroundColor: Colors.white.withOpacity(0.6),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))
+                        ),
+                        icon: const Icon(Icons.download_rounded),
+                        label: const Text("DESCARGAR RECIBO EN PDF", style: TextStyle(fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                           // _pdfService.imprimirRecibo(widget.recibo); // Descomentar cuando actualices tu PdfService
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

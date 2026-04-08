@@ -4,8 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 import 'screens/public_home_screen.dart';
 import 'screens/login_screen.dart';
-import 'screens/admin_dashboard.dart';
+import 'screens/user_home_screen.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/foundation.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,9 +15,10 @@ void main() async {
 
   await initializeDateFormatting('es', null);
 
-  // Configuración Offline
-  FirebaseFirestore.instance.settings = const Settings(
-    persistenceEnabled: true,
+  await dotenv.load(fileName: ".env");
+
+  FirebaseFirestore.instance.settings = Settings(
+    persistenceEnabled: !kIsWeb,
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
 
@@ -30,65 +33,74 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Agua Potable',
-      // --- TEMA TURQUESA (CLEAN WATER) ---
       theme: ThemeData(
         useMaterial3: true,
-        // Definimos la semilla de color Turquesa
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF00796B), // Color Principal (Turquesa)
-          primary: const Color(0xFF00695C),   // Turquesa Oscuro
-          secondary: const Color(0xFF4DB6AC), // Turquesa Claro
-          surface: const Color(0xFFF5F7FA),   // Fondo gris muy suave
-          background: const Color(0xFFF5F7FA),
+          seedColor: const Color(0xFF6CD8C4),
+          primary: const Color(0xFF6CD8C4),
+          secondary: const Color(0xFF8BB1F5),
+          surface: Colors.white.withOpacity(0.7),
+          // ¡ELIMINADO: background ya no existe en las nuevas versiones de Flutter!
         ),
-        scaffoldBackgroundColor: const Color(0xFFF5F7FA),
         
-        // Estilo de los AppBar (Barra superior)
+        // Aquí es donde realmente se define el color de fondo de la app
+        scaffoldBackgroundColor: const Color(0xFFF0F7F7),
+
         appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF00796B),
-          foregroundColor: Colors.white, // Texto blanco
+          backgroundColor: Colors.transparent,
+          foregroundColor: Color(0xFF2C3E50),
           centerTitle: true,
-          elevation: 2,
+          elevation: 0,
         ),
 
-        // Estilo de Botones (Rellenos)
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF00796B), // Fondo Turquesa
-            foregroundColor: Colors.white, // Letra Blanca
-            elevation: 3,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            backgroundColor: const Color(0xFF6CD8C4),
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shadowColor: const Color(0xFF6CD8C4).withOpacity(0.4),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(30),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 28),
+            textStyle: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+            ),
           ),
         ),
-        
-        // Estilo de Inputs (Cajas de texto)
+
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: Colors.white,
+          fillColor: Colors.white.withOpacity(0.8),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(20),
             borderSide: BorderSide.none,
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(20),
+            borderSide: BorderSide(
+              color: Colors.white.withOpacity(0.5),
+              width: 2,
+            ),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF00796B), width: 2),
+            borderRadius: BorderRadius.circular(20),
+            borderSide: const BorderSide(color: Color(0xFF6CD8C4), width: 2),
           ),
-          prefixIconColor: const Color(0xFF00796B),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          prefixIconColor: const Color(0xFF8BB1F5),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 18,
+          ),
         ),
       ),
-      // -----------------------------------
-      
+
       home: PublicHomeScreen(),
       routes: {
-        '/login': (context) => LoginScreen(),
-        '/admin_dashboard': (context) => AdminDashboard(),
+        '/login': (context) => const LoginScreen(),
+        '/user_home': (context) => UserHomeScreen(),
       },
     );
   }
