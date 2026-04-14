@@ -328,7 +328,7 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
                         icon: const Icon(Icons.download_rounded),
                         label: const Text("DESCARGAR RECIBO EN PDF", style: TextStyle(fontWeight: FontWeight.bold)),
                         onPressed: () {
-                           // _pdfService.imprimirRecibo(widget.recibo); // Descomentar cuando actualices tu PdfService
+                           _pdfService.imprimirRecibo(widget.recibo); // Descomentar cuando actualices tu PdfService
                         },
                       ),
                     ),
