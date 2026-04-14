@@ -1,14 +1,11 @@
 import 'dart:typed_data';
 import 'package:printing/printing.dart';
 import '../services/api_service.dart';
-// Eliminamos la importación del receipt_model.dart
 
 class PdfService {
   final ApiService _apiService = ApiService();
 
-  // Ahora recibimos el JSON dinámico directamente (Map<String, dynamic>)
   Future<void> imprimirRecibo(Map<String, dynamic> recibo) async {
-    // Extraemos el ID y el nombre del periodo usando las llaves exactas de tu JSON
     final String reciboId = recibo['recibo_id'] ?? '';
     final String periodoLabel = recibo['periodo_label'] ?? 'Recibo';
 
@@ -17,22 +14,27 @@ class PdfService {
       return;
     }
 
-    // 1. Le pedimos el archivo PDF oficial a la API usando el reciboId
+    // 1. Le pedimos el archivo PDF oficial a la API
     final List<int>? bytes = await _apiService.descargarTicketPdfBytes(reciboId);
 
-    if (bytes != null) {
-      // 2. Convertimos los datos al formato que usa Flutter para imprimir
+    // 2. Revisamos si la API nos mandó el PDF o nos mandó a volar (como en los pendientes)
+    if (bytes != null && bytes.isNotEmpty) {
+      
       final Uint8List pdfData = Uint8List.fromList(bytes);
 
-      // 3. Abrimos la pantalla nativa del celular para Imprimir o Compartir el PDF
-      await Printing.layoutPdf(
-        onLayout: (format) async => pdfData,
-        // Le damos un nombre bonito al archivo (ej. Ticket_ABRIL_DE_2026)
-        name: 'Ticket_${periodoLabel.replaceAll(" ", "_")}',
+      // 3. Usamos sharePdf. En la Web, esto fuerza la DESCARGA del archivo.
+      // Así evitamos que Vercel o el navegador bloqueen la ventana de impresión.
+      await Printing.sharePdf(
+        bytes: pdfData,
+        filename: 'Ticket_${periodoLabel.replaceAll(" ", "_")}.pdf',
       );
+      
     } else {
-      // Si por alguna razón de red falla la descarga o el token expiró
-      print("Error: No se pudo descargar el ticket oficial del servidor.");
+      // ⚠️ AQUÍ ESTÁ EL TEMA DE LOS PENDIENTES
+      print("❌ El servidor NO devolvió el PDF del recibo $reciboId.");
+      print("Probablemente la API no genera tickets para recibos con estatus 'Pendiente'.");
+      // Opcional: Aquí podrías mostrar un SnackBar en pantalla que diga: 
+      // "Este recibo aún no está pagado o no tiene ticket disponible."
     }
   }
 }
