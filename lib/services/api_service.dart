@@ -115,7 +115,7 @@ class ApiService {
           throw Exception('Sesión totalmente expirada. Vuelve a iniciar sesión.');
         }
       }
-
+    
       // Si todo salió bien, devolvemos la lista cruda
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
@@ -162,13 +162,52 @@ class ApiService {
   }
 
   // --------------------------------------------------------
-  // 5. PAGAR RECIBO (Endpoint Oficial para Mercado Pago)
+  // 5. GENERAR LINK DE MERCADO PAGO (Microservicio Vercel local)
   // --------------------------------------------------------
-  Future<bool> pagarRecibo(String reciboId) async {
+  Future<String?> generarLinkMercadoPago({
+    required String reciboId,
+    required double monto,
+    required String titulo,
+  }) async {
+    // IMPORTANTE: Cuando despliegues en Vercel, esta será la ruta a la función.
+    // Mientras pruebas localmente en Android/iOS, necesitas usar la URL completa de Vercel.
+    // Ej: const String pwaDomain = 'https://tu-proyecto-agua.vercel.app';
+    const String pwaDomain = 'https://hydra-real.vercel.app'; // Cámbialo si tu PWA tiene otro dominio
+    final url = Uri.parse('$pwaDomain/api/mercadopago');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          "recibo_id": reciboId, 
+          "monto": monto,
+          "titulo": titulo
+        }),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['init_point']; // Link generado exitosamente
+      } else {
+        print('Error en Vercel Function: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Error de conexión a Vercel: $e');
+      return null;
+    }
+  }
+
+  // --------------------------------------------------------
+  // 6. REGISTRAR PAGO COMPLETADO EN HYDRA
+  // --------------------------------------------------------
+  Future<bool> registrarPagoHydra(String reciboId, String referenciaExterna) async {
     final prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('access_token');
     if (token == null) return false;
 
+    // Llama a la API oficial de Hydra para marcar el recibo como pagado
     final url = Uri.parse('$baseUrl/me/recibos/$reciboId/pagar');
     try {
       final response = await http.post(
@@ -179,13 +218,13 @@ class ApiService {
         },
         body: jsonEncode({
           "metodo_pago": "externo", 
-          "referencia_externa": "pago_app_mercadopago" 
+          "referencia_externa": referenciaExterna 
         }),
       );
       
       return response.statusCode == 200;
     } catch (e) {
-      print('Error al pagar el recibo: $e');
+      print('Error al notificar a Hydra del pago: $e');
       return false;
     }
   }
