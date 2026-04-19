@@ -84,7 +84,6 @@ class ApiService {
 
     if (token == null) throw Exception('No hay token');
 
-    // Cambiamos al endpoint que te funcionó en Postman
     final url = Uri.parse('$baseUrl/me/recibos');
     
     try {
@@ -119,10 +118,7 @@ class ApiService {
       // Si todo salió bien, devolvemos la lista cruda
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
-        
-        // El JSON de tu Postman traía la lista directo en la llave "recibos"
         List<dynamic> recibosJson = decoded['recibos'] ?? [];
-        
         return recibosJson;
       }
       
@@ -169,9 +165,6 @@ class ApiService {
     required double monto,
     required String titulo,
   }) async {
-    // IMPORTANTE: Cuando despliegues en Vercel, esta será la ruta a la función.
-    // Mientras pruebas localmente en Android/iOS, necesitas usar la URL completa de Vercel.
-    // Ej: const String pwaDomain = 'https://tu-proyecto-agua.vercel.app';
     const String pwaDomain = 'https://pozo-cazadero.vercel.app';
     final url = Uri.parse('$pwaDomain/api/mercadopago');
 
@@ -180,7 +173,7 @@ class ApiService {
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          "recibo_id": reciboId, 
+          "reciboId": reciboId, // <-- CORREGIDO para coincidir con Node.js
           "monto": monto,
           "titulo": titulo
         }),
@@ -188,7 +181,7 @@ class ApiService {
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['init_point']; // Link generado exitosamente
+        return data['url']; // <-- CORREGIDO porque Node.js devuelve {"url": "..."}
       } else {
         print('Error en Vercel Function: ${response.body}');
         return null;
@@ -207,7 +200,6 @@ class ApiService {
     String? token = prefs.getString('access_token');
     if (token == null) return false;
 
-    // Llama a la API oficial de Hydra para marcar el recibo como pagado
     final url = Uri.parse('$baseUrl/me/recibos/$reciboId/pagar');
     try {
       final response = await http.post(
@@ -230,7 +222,7 @@ class ApiService {
   }
 
   // --------------------------------------------------------
-  // 6. CERRAR SESIÓN
+  // 7. CERRAR SESIÓN
   // --------------------------------------------------------
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();

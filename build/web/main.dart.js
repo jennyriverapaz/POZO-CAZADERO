@@ -41955,11 +41955,11 @@ p=4
 k=t.N
 j=A.a6(["Content-Type","application/json"],k,k)
 s=7
-return A.B(A.aul(h,B.bl.uo(A.a6(["recibo_id",b,"monto",a,"titulo",c],k,t.K),null),j),$async$vO)
+return A.B(A.aul(h,B.bl.uo(A.a6(["reciboId",b,"monto",a,"titulo",c],k,t.K),null),j),$async$vO)
 case 7:n=e
 if(n.b===200){k=n
 m=B.bl.ua(A.YG(A.Yq(k.e)).ek(k.w),null)
-k=J.cK(m,"init_point")
+k=J.cK(m,"url")
 q=k
 s=1
 break}else{k=n
