@@ -41950,7 +41950,7 @@ return A.F($async$ud,r)},
 vO(a,b,c){return this.Y0(a,b,c)},
 Y0(a,b,c){var s=0,r=A.G(t.T),q,p=2,o=[],n,m,l,k,j,i,h,g
 var $async$vO=A.H(function(d,e){if(d===1){o.push(e)
-s=p}while(true)switch(s){case 0:h=A.dQ("https://hydra-real.vercel.app/api/mercadopago",0,null)
+s=p}while(true)switch(s){case 0:h=A.dQ("https://pozo-cazadero.vercel.app/api/mercadopago",0,null)
 p=4
 k=t.N
 j=A.a6(["Content-Type","application/json"],k,k)

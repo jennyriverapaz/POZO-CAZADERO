@@ -172,7 +172,7 @@ class ApiService {
     // IMPORTANTE: Cuando despliegues en Vercel, esta será la ruta a la función.
     // Mientras pruebas localmente en Android/iOS, necesitas usar la URL completa de Vercel.
     // Ej: const String pwaDomain = 'https://tu-proyecto-agua.vercel.app';
-    const String pwaDomain = 'https://hydra-real.vercel.app'; // Cámbialo si tu PWA tiene otro dominio
+    const String pwaDomain = 'https://pozo-cazadero.vercel.app';
     final url = Uri.parse('$pwaDomain/api/mercadopago');
 
     try {
