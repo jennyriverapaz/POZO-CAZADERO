@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     // 3. Inicializamos Mercado Pago con tu Token
     // IMPORTANTE: El token lo configuraremos en Vercel, no lo pongas directo en el código por seguridad
     const client = new MercadoPagoConfig({ 
-      accessToken: process.env.MP_ACCESS_TOKEN 
+      accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN 
     });
 
     // 4. Creamos la "Preferencia" de pago (el cobro)
