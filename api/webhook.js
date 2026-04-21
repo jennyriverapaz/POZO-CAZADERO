@@ -12,7 +12,7 @@ export default async function handler(req, res) {
         // 1. Preguntarle a Mercado Pago los detalles de este pago (para sacar la metadata)
         // OJO: Reemplaza "TU_ACCESS_TOKEN_DE_MERCADO_PAGO" con el tuyo
         const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-          headers: { 'Authorization': `Bearer TU_ACCESS_TOKEN_DE_MERCADO_PAGO` }
+          headers: { 'Authorization': `Bearer MERCADOPAGO_ACCESS_TOKEN` }
         });
         const paymentData = await mpResponse.json();
 
