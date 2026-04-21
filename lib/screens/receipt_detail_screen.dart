@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-// Quité la importación de ReceiptModel por ahora para usar el Map directo
 import '../services/database_service.dart';
 import '../services/pdf_service.dart';
 import '../services/api_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ReceiptDetailScreen extends StatefulWidget {
-  // Ahora recibimos el mapa exacto del JSON y algunos datos extra si los tienes
   final Map<String, dynamic> recibo;
   final String numeroContrato; 
-  final String nombreUsuario; // Pasarlo desde el login/perfil
-  final String direccion; // Pasarlo desde el login/perfil
+  final String nombreUsuario; 
+  final String direccion; 
 
   const ReceiptDetailScreen({
     super.key, 
@@ -33,11 +31,8 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
   Future<void> _iniciarPagoMercadoPago() async {
     setState(() => _isLoadingPayment = true);
     
-    // Obtenemos los totales y el recibo desde el JSON actual
     double totalAPagar = (widget.recibo['total'] ?? 0).toDouble();
     String periodoLabel = widget.recibo['periodo_label'] ?? 'PERIODO';
-
-    // Asumimos que el ID del recibo en el backend puede llamarse 'id', 'recibo_id' o 'folio'
     String reciboId = widget.recibo['id']?.toString() ?? widget.recibo['recibo_id']?.toString() ?? widget.recibo['folio']?.toString() ?? '';
     
     if (reciboId.isEmpty) {
@@ -50,7 +45,6 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
       return;
     }
 
-    // Llama al microservicio en Vercel
     final String? paymentUrl = await ApiService().generarLinkMercadoPago(
       reciboId: reciboId,
       monto: totalAPagar,
@@ -63,12 +57,11 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
     if (paymentUrl != null && paymentUrl.isNotEmpty) {
       final Uri url = Uri.parse(paymentUrl);
       if (await canLaunchUrl(url)) {
-        // Lanzamos el link de Mercado Pago (Checkout Pro)
         await launchUrl(url, mode: LaunchMode.externalApplication);
         
-        // Al regresar a la app, preguntamos si completó el pago
+        // Al regresar a la app, mostramos el diálogo seguro (Sin opción a hacer trampa)
         if (mounted) {
-           _mostrarDialogoConfirmacion(reciboId);
+           _mostrarDialogoConfirmacion();
         }
 
       } else {
@@ -83,41 +76,22 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
     }
   }
 
-  void _mostrarDialogoConfirmacion(String reciboId) {
+  // --- DIÁLOGO SEGURO ---
+  // Ahora solo informa al usuario, no actualiza la base de datos desde la app
+  void _mostrarDialogoConfirmacion() {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text("Verificación de Pago"),
-        content: const Text("¿Completaste el pago exitosamente en Mercado Pago?"),
+        title: const Text("Pago en Proceso"),
+        content: const Text("Si completaste tu pago en Mercado Pago, nuestro sistema lo validará de forma automática y segura en unos momentos.\n\nEl estado de tu recibo se actualizará a 'Pagado' en cuanto el banco confirme la transacción."),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context), // Cierra si no pagó
-            child: const Text("No, cancelar"),
-          ),
           ElevatedButton(
-            onPressed: () async {
+            onPressed: () {
               Navigator.pop(context); // Cierra modal
-              setState(() => _isLoadingPayment = true);
-              
-              // Registra en Hydra que el usuario reporta el recibo como pagado
-              bool exito = await ApiService().registrarPagoHydra(reciboId, 'pago_mp_externo_movil');
-              
-              if (mounted) {
-                setState(() => _isLoadingPayment = false);
-                if (exito) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Pago registrado exitosamente. El estado se actualizará en breve."), backgroundColor: Colors.green),
-                  );
-                  Navigator.pop(context, true); // Regresa al historial indicando que hay cambios
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Error al notificar al sistema principal."), backgroundColor: Colors.red),
-                  );
-                }
-              }
+              Navigator.pop(context, true); // Regresa al Home indicando que debe recargar la lista
             },
-            child: const Text("Sí, ya pagué"),
+            child: const Text("Entendido"),
           )
         ],
       ),
@@ -194,17 +168,14 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context).colorScheme;
     
-    // --- LEYENDO EL JSON REAL ---
     bool pagado = widget.recibo['estado'] == 'pagado';
     String periodoLabel = widget.recibo['periodo_label'] ?? 'PERIODO';
     double totalAPagar = (widget.recibo['total'] ?? 0).toDouble();
     List<dynamic> lineas = widget.recibo['lineas'] ?? [];
     
-    // Fechas
     DateTime fechaEmision = DateTime.tryParse(widget.recibo['fecha_emision'] ?? '') ?? DateTime.now();
     String fechaVencimientoStr = widget.recibo['fecha_vencimiento'] ?? '';
     
-    // Colores dinámicos
     Color estadoColor = pagado ? Colors.green : theme.error;
     String estadoTexto = pagado ? "PAGADO" : "PENDIENTE DE PAGO";
 
@@ -409,7 +380,7 @@ class _ReceiptDetailScreenState extends State<ReceiptDetailScreen> {
                         icon: const Icon(Icons.download_rounded),
                         label: const Text("DESCARGAR RECIBO EN PDF", style: TextStyle(fontWeight: FontWeight.bold)),
                         onPressed: () {
-                           _pdfService.imprimirRecibo(widget.recibo); // Descomentar cuando actualices tu PdfService
+                           _pdfService.imprimirRecibo(widget.recibo); 
                         },
                       ),
                     ),

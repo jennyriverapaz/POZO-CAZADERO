@@ -168,20 +168,25 @@ class ApiService {
     const String pwaDomain = 'https://pozo-cazadero.vercel.app';
     final url = Uri.parse('$pwaDomain/api/mercadopago');
 
+//  Obtenemos el token del usuario actual
+    final prefs = await SharedPreferences.getInstance();
+    String? token = prefs.getString('access_token');
+
     try {
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          "reciboId": reciboId, // <-- CORREGIDO para coincidir con Node.js
+          "reciboId": reciboId,
           "monto": monto,
-          "titulo": titulo
+          "titulo": titulo,
+          "token_ciudadano": token ?? "" // Lo mandamos a Vercel
         }),
       );
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['url']; // <-- CORREGIDO porque Node.js devuelve {"url": "..."}
+        return data['url']; 
       } else {
         print('Error en Vercel Function: ${response.body}');
         return null;

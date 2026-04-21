@@ -1,28 +1,25 @@
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 
 export default async function handler(req, res) {
-  // Solo aceptamos peticiones POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido' });
   }
 
   try {
-    // 1. Extraemos los datos que manda tu app en Flutter
-    const { titulo, monto, reciboId } = req.body;
+    // 1. Extraemos los datos (ahora recibimos token_ciudadano de Flutter)
+    const { titulo, monto, reciboId, token_ciudadano } = req.body;
 
-    // 2. Validamos que vengan los datos
     if (!monto) {
       return res.status(400).json({ error: 'Falta el monto a pagar' });
     }
 
-    // 3. Inicializamos Mercado Pago con tu Token
-    // IMPORTANTE: El token lo configuraremos en Vercel, no lo pongas directo en el código por seguridad
     const client = new MercadoPagoConfig({ 
       accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN 
     });
 
-    // 4. Creamos la "Preferencia" de pago (el cobro)
     const preference = new Preference(client);
+    
+    // 2. Creamos la "Preferencia" con esteroides
     const response = await preference.create({
       body: {
         items: [
@@ -34,7 +31,15 @@ export default async function handler(req, res) {
             currency_id: 'MXN'
           }
         ],
-        // Opcional: A dónde redirigir al usuario cuando termine
+        // Esto le dice a Mercado Pago a qué archivo llamar para avisar del pago
+        notification_url: "https://pozo-cazadero.vercel.app/api/webhook",
+        
+        // Estos datos NO los ve el usuario, pero nos los devuelve el Webhook
+        metadata: {
+          recibo_id: reciboId,
+          token_ciudadano: token_ciudadano 
+        },
+
         back_urls: {
           success: "https://pozo-cazadero.vercel.app",
           failure: "https://pozo-cazadero.vercel.app",
@@ -44,8 +49,6 @@ export default async function handler(req, res) {
       }
     });
 
-    // 5. Devolvemos el link de pago a Flutter
-    // init_point es el link de Checkout Pro
     return res.status(200).json({ 
       url: response.init_point 
     });
