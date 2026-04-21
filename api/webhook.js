@@ -1,54 +1,67 @@
-// api/webhook.js
-
 export default async function handler(req, res) {
   if (req.method === 'POST') {
-    const paymentInfo = req.query; 
+    // 1. Vemos qué nos mandó Mercado Pago exactamente
+    console.log("➡️ 1. Webhook tocado por Mercado Pago. Query:", req.query);
 
-    // Verificamos si Mercado Pago nos avisa de un pago
+    const paymentInfo = req.query;
+
     if (paymentInfo.type === 'payment') {
       const paymentId = paymentInfo['data.id'];
+      console.log(`🔍 2. Es un pago válido con ID: ${paymentId}`);
       
       try {
-        // 1. Preguntarle a Mercado Pago los detalles de este pago (para sacar la metadata)
-        // OJO: Reemplaza "TU_ACCESS_TOKEN_DE_MERCADO_PAGO" con el tuyo
+        // 3. Usamos tu variable de entorno automáticamente (¡más seguro!)
+        const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
+        console.log("🌐 3. Consultando detalles a Mercado Pago...");
+        
         const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-          headers: { 'Authorization': `Bearer MERCADOPAGO_ACCESS_TOKEN` }
+          headers: { 'Authorization': `Bearer ${token}` }
         });
         const paymentData = await mpResponse.json();
+        
+        console.log(`💰 4. Estado del pago en Mercado Pago: ${paymentData.status}`);
 
-        // Si el pago está aprobado
         if (paymentData.status === 'approved') {
-          // 2. Sacamos los datos secretos que escondimos
-          const reciboId = paymentData.metadata.recibo_id;
-          const tokenCiudadano = paymentData.metadata.token_ciudadano;
-
-          // 3. ¡Llamamos a Hydra simulando ser la app!
-          const hydraUrl = `https://hydra-real.vercel.app/api/ciudadanos/me/recibos/${reciboId}/pagar`;
+          // Extraemos de metadata (usamos ? para evitar errores si viene vacío)
+          const reciboId = paymentData.metadata?.recibo_id;
+          const tokenCiudadano = paymentData.metadata?.token_ciudadano;
           
-          const hydraResponse = await fetch(hydraUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${tokenCiudadano}`
-            },
-            body: JSON.stringify({
-              metodo_pago: "externo",
-              referencia_externa: `MP_${paymentId}`
-            })
-          });
+          console.log(`📦 5. Datos ocultos - Recibo: ${reciboId || 'Ninguno'}, Token: ${tokenCiudadano ? 'Sí existe' : 'No existe'}`);
 
-          if (hydraResponse.ok) {
-            console.log(`¡Éxito! Recibo ${reciboId} marcado como pagado en Hydra.`);
+          if (!reciboId || !tokenCiudadano) {
+             console.log("❌ Error: Faltan los metadatos. El pago no se enlazará a Hydra.");
           } else {
-            console.error(`Error al avisar a Hydra:`, await hydraResponse.text());
+            const hydraUrl = `https://hydra-real.vercel.app/api/ciudadanos/me/recibos/${reciboId}/pagar`;
+            console.log("🚀 6. Avisando a Hydra en la URL:", hydraUrl);
+            
+            const hydraResponse = await fetch(hydraUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${tokenCiudadano}` // Nos hacemos pasar por el ciudadano
+              },
+              body: JSON.stringify({
+                metodo_pago: "externo",
+                referencia_externa: `MP_${paymentId}`
+              })
+            });
+
+            if (hydraResponse.ok) {
+              console.log(`✅ ¡ÉXITO TOTAL! Recibo ${reciboId} marcado como pagado en Hydra.`);
+            } else {
+              const errorText = await hydraResponse.text();
+              console.error(`❌ Error en Hydra (Código ${hydraResponse.status}):`, errorText);
+            }
           }
         }
       } catch (error) {
-        console.error("Error procesando webhook:", error);
+        console.error("❌ Error grave en el servidor:", error);
       }
+    } else {
+      console.log("⚠️ Ignorando evento que no es 'payment'. Tipo:", paymentInfo.type);
     }
 
-    // Siempre responder 200 a Mercado Pago rápido
+    // Siempre responder rápido a Mercado Pago
     return res.status(200).send('OK');
   }
 
