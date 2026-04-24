@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'dart:async';
 
 class WaterDropMascot extends StatefulWidget {
   const WaterDropMascot({Key? key}) : super(key: key);
@@ -12,8 +13,10 @@ class _WaterDropMascotState extends State<WaterDropMascot> with SingleTickerProv
   late AnimationController _controller;
   late Animation<double> _animation;
   late String _currentTip;
+  Timer? _tipTimer;
 
-  final List<String> _waterTips = [
+  // ... (tu lista _waterTips se queda igual, no la borres) ...
+    final List<String> _waterTips = [
     "¡Hola! ¿Sabías que solo el 1% del agua del planeta es dulce y accesible?",
     "Cierra la llave al cepillarte los dientes y ahorra hasta 15 litros por minuto.",
     "Una llave goteando puede desperdiciar más de 30 litros de agua al día.",
@@ -117,148 +120,78 @@ class _WaterDropMascotState extends State<WaterDropMascot> with SingleTickerProv
     "100. ¡Felicidades por leer los tips! Eres vital en el rescate del agua del mundo."
   ];
 
+
   @override
   void initState() {
     super.initState();
+    // Controlador para la animación (flotar y respirar)
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: const Duration(seconds: 3), // Un poco más lento para que sea más natural
     )..repeat(reverse: true);
     
-    _animation = Tween<double>(begin: -5, end: 5).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-
     _currentTip = _waterTips[math.Random().nextInt(_waterTips.length)];
+    _tipTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      if (mounted) { // Verificamos que el widget siga activo
+        setState(() {
+          _currentTip = _waterTips[math.Random().nextInt(_waterTips.length)];
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _tipTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, _animation.value),
-          child: child,
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.all(16),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        decoration: BoxDecoration(
-          color: Colors.blue.shade50,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.blue.shade100, width: 2),
-          boxShadow: [
-             BoxShadow(
-               color: Colors.blue.withOpacity(0.15),
-               blurRadius: 10,
-               offset: const Offset(0, 5),
-             )
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Mascota Gotita
-            _buildMascot(),
-            const SizedBox(width: 15),
-            // Burbuja de texto
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    "💧 Goti-Tip!",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Colors.blueAccent,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    _currentTip,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.black87,
-                      height: 1.3,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.blue.shade100, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blue.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          )
+        ],
       ),
-    );
-  }
-
-  Widget _buildMascot() {
-    return SizedBox(
-      width: 70,
-      height: 80,
-      child: Stack(
-        alignment: Alignment.center,
+      child: Row(
         children: [
-          // Forma de gota
-          Positioned(
-            bottom: 5,
-            child: Transform.rotate(
-              angle: math.pi / 4, // 45 grados
-              child: Container(
-                width: 50,
-                height: 50,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.lightBlueAccent, Colors.blue],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(0), // Punta de la gota orientada hacia arriba-izquierda (girada 45deg = recta hacia arriba)
-                    topRight: Radius.circular(50),
-                    bottomLeft: Radius.circular(50),
-                    bottomRight: Radius.circular(50),
-                  ),
+          // MASCOTA ANIMADA
+          AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              return Transform.translate(
+                offset: Offset(0, _controller.value * 10), // Flota 10px arriba/abajo
+                child: Transform.scale(
+                  scale: 1.0 + (_controller.value * 0.05), // "Respira" un 5%
+                  child: child,
                 ),
-              ),
-            ),
+              );
+            },
+            child: Image.asset('assets/images/drop_3d.png', width: 80, height: 80),
           ),
-          // Lentes 🤓
-          const Positioned(
-            top: 28,
-            child: Text("👓", style: TextStyle(fontSize: 27)),
-          ),
-          // Sonrisa simple
-          Positioned(
-            top: 50,
-            child: Container(
-              width: 12,
-              height: 5,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(10),
-                  bottomRight: Radius.circular(10),
-                ),
-              ),
-            ),
-          ),
-          // iPad 📱 (lo carga en un costado)
-          Positioned(
-            top: 45,
-            right: 0,
-            child: Transform.rotate(
-              angle: -0.2,
-              child: const Text("📱", style: TextStyle(fontSize: 20)),
+          
+          const SizedBox(width: 20),
+          
+          // Burbuja de texto
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("💧 Goti-Tip!", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color.fromARGB(255, 237, 238, 240))),
+                const SizedBox(height: 6),
+                Text(_currentTip, style: const TextStyle(fontSize: 14, color: Color.fromARGB(221, 248, 247, 247), height: 1.4)),
+              ],
             ),
           ),
         ],

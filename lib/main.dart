@@ -12,9 +12,7 @@ import 'package:flutter/foundation.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
   await initializeDateFormatting('es', null);
-
   await dotenv.load(fileName: ".env");
 
   FirebaseFirestore.instance.settings = Settings(
@@ -30,74 +28,65 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // NUEVA PALETA: DARK & NEON
+    const Color bgDark = Color(0xFF090E17); // Azul medianoche casi negro
+    const Color neonMint = Color(0xFF00E5FF); // Cian/Menta Neón vibrante
+    const Color darkSurface = Color(0xFF151D2A); // Color para tarjetas oscuras
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Agua Potable',
       theme: ThemeData(
+        brightness: Brightness.dark, // FORZAMOS EL MODO OSCURO
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6CD8C4),
-          primary: const Color(0xFF6CD8C4),
-          secondary: const Color(0xFF8BB1F5),
-          surface: Colors.white.withOpacity(0.7),
-          // ¡ELIMINADO: background ya no existe en las nuevas versiones de Flutter!
-        ),
+        scaffoldBackgroundColor: bgDark,
         
-        // Aquí es donde realmente se define el color de fondo de la app
-        scaffoldBackgroundColor: const Color(0xFFF0F7F7),
+        colorScheme: const ColorScheme.dark(
+          primary: neonMint,
+          secondary: Color(0xFF00FF9D), // Verde esmeralda neón
+          surface: darkSurface,
+          onSurface: Colors.white,
+        ),
 
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.transparent,
-          foregroundColor: Color(0xFF2C3E50),
+          foregroundColor: Colors.white,
           centerTitle: true,
           elevation: 0,
         ),
 
+        // Botones globales brillantes para contrastar con el fondo oscuro
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF6CD8C4),
-            foregroundColor: Colors.white,
-            elevation: 0,
-            shadowColor: const Color(0xFF6CD8C4).withOpacity(0.4),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(30),
-            ),
+            backgroundColor: neonMint,
+            foregroundColor: Colors.black, // Texto negro sobre botón neón resalta súper bien
+            shadowColor: neonMint.withOpacity(0.5),
+            elevation: 10,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
             padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 28),
-            textStyle: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
-            ),
+            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
         ),
 
+        // Inputs estilo Dark Glass
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: Colors.white.withOpacity(0.8),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(20),
-            borderSide: BorderSide.none,
-          ),
+          fillColor: Colors.white.withOpacity(0.05),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(20),
-            borderSide: BorderSide(
-              color: Colors.white.withOpacity(0.5),
-              width: 2,
-            ),
+            borderSide: BorderSide(color: Colors.white.withOpacity(0.1), width: 1.5),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(20),
-            borderSide: const BorderSide(color: Color(0xFF6CD8C4), width: 2),
+            borderSide: const BorderSide(color: neonMint, width: 2),
           ),
-          prefixIconColor: const Color(0xFF8BB1F5),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: 18,
-          ),
+          prefixIconColor: neonMint,
+          hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
         ),
       ),
 
-      home: PublicHomeScreen(),
+      home: const PublicHomeScreen(),
       routes: {
         '/login': (context) => const LoginScreen(),
         '/user_home': (context) => UserHomeScreen(),
