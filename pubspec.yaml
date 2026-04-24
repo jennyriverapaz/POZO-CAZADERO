@@ -57,4 +57,8 @@ flutter:
 flutter_icons:
   android: true
   ios: true
-  image_path: "assets/icon/pozo_app_logo.png" # Pon la ruta exacta de tu imagen aquí
+  image_path: "assets/icon/pozo_app_logo.png"
+
+  web:
+    generate: true
+    image_path: "assets/icon/pozo_app_logo.png"

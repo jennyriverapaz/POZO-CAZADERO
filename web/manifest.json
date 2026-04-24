@@ -1,6 +1,6 @@
 {
-    "name": "agua_pwa",
-    "short_name": "agua_pwa",
+    "name": "Pozo Cazadero",
+    "short_name": "Pozo Cazadero",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
